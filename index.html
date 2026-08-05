@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="description" content="Track your income, expenses, and investments with category breakdowns." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FlowTrack" />
+  <title>FlowTrack – Money Movement Tracker</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ── AUTH SCREEN ── -->
+<div id="auth-screen" class="screen active">
+  <div class="auth-hero">
+    <div class="auth-logo">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <rect width="48" height="48" rx="14" fill="#6366f1"/>
+        <path d="M12 32 L20 20 L28 26 L36 14" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="36" cy="14" r="3" fill="#a5f3fc"/>
+      </svg>
+    </div>
+    <h1 class="auth-title">FlowTrack</h1>
+    <p class="auth-sub">Your money movements, clearly mapped.</p>
+  </div>
+  <div class="auth-card">
+    <div id="auth-error" class="alert alert-error hidden"></div>
+    <div id="login-form">
+      <h2>Sign in</h2>
+      <button id="btn-google" class="btn btn-google">
+        <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <div class="divider"><span>or</span></div>
+      <input type="email" id="email" class="input" placeholder="Email address" autocomplete="email" />
+      <input type="password" id="password" class="input" placeholder="Password" autocomplete="current-password" />
+      <button id="btn-signin" class="btn btn-primary">Sign In</button>
+      <p class="auth-switch">No account? <a href="#" id="to-signup">Create one</a></p>
+    </div>
+    <div id="signup-form" class="hidden">
+      <h2>Create account</h2>
+      <input type="text" id="signup-name" class="input" placeholder="Your name" />
+      <input type="email" id="signup-email" class="input" placeholder="Email address" autocomplete="email" />
+      <input type="password" id="signup-password" class="input" placeholder="Password (min 6 chars)" autocomplete="new-password" />
+      <button id="btn-signup" class="btn btn-primary">Create Account</button>
+      <p class="auth-switch">Have an account? <a href="#" id="to-login">Sign in</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP SHELL ── -->
+<div id="app-screen" class="screen hidden">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
+        <rect width="48" height="48" rx="14" fill="#6366f1"/>
+        <path d="M12 32 L20 20 L28 26 L36 14" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="36" cy="14" r="3" fill="#a5f3fc"/>
+      </svg>
+      <span class="app-name">FlowTrack</span>
+    </div>
+    <div class="header-right">
+      <span id="user-name" class="user-chip"></span>
+      <button id="btn-signout" class="btn-icon" title="Sign out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Summary Bar -->
+  <section class="summary-bar">
+    <div class="summary-card income">
+      <div class="summary-label">Income</div>
+      <div class="summary-amount" id="total-income">₹0</div>
+    </div>
+    <div class="summary-card expense">
+      <div class="summary-label">Expenses</div>
+      <div class="summary-amount" id="total-expense">₹0</div>
+    </div>
+    <div class="summary-card invest">
+      <div class="summary-label">Invested</div>
+      <div class="summary-amount" id="total-invest">₹0</div>
+    </div>
+    <div class="summary-card net">
+      <div class="summary-label">Net Balance</div>
+      <div class="summary-amount" id="total-net">₹0</div>
+    </div>
+  </section>
+
+  <!-- Nav Tabs -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="dashboard">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </button>
+    <button class="tab-btn" data-tab="transactions">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Transactions
+    </button>
+    <button class="tab-btn" data-tab="categories">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 118 2.83"/><path d="M22 12A10 10 0 0012 2v10z"/></svg>
+      Categories
+    </button>
+  </nav>
+
+  <!-- DASHBOARD TAB -->
+  <div id="tab-dashboard" class="tab-content active">
+    <div class="section-header">
+      <h3>Category Breakdown</h3>
+      <select id="period-filter" class="select-sm">
+        <option value="all">All time</option>
+        <option value="month" selected>This month</option>
+        <option value="week">This week</option>
+      </select>
+    </div>
+    <div id="category-bars" class="category-bars"></div>
+    <div class="section-header" style="margin-top:24px">
+      <h3>Recent Activity</h3>
+      <a href="#" id="view-all-link" class="link-sm">View all</a>
+    </div>
+    <div id="recent-list" class="tx-list"></div>
+    <div id="empty-dash" class="empty-state hidden">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <p>No transactions yet.<br/>Add your first one below.</p>
+    </div>
+  </div>
+
+  <!-- TRANSACTIONS TAB -->
+  <div id="tab-transactions" class="tab-content hidden">
+    <div class="filter-row">
+      <select id="tx-type-filter" class="select-sm">
+        <option value="all">All types</option>
+        <option value="income">Income</option>
+        <option value="expense">Expense</option>
+        <option value="investment">Investment</option>
+      </select>
+      <select id="tx-cat-filter" class="select-sm">
+        <option value="all">All categories</option>
+      </select>
+      <input type="month" id="tx-month-filter" class="select-sm" />
+    </div>
+    <div id="tx-list-full" class="tx-list"></div>
+    <div id="empty-tx" class="empty-state hidden">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <p>No transactions match your filters.</p>
+    </div>
+  </div>
+
+  <!-- CATEGORIES TAB -->
+  <div id="tab-categories" class="tab-content hidden">
+    <div class="section-header">
+      <h3>Your Categories</h3>
+      <button id="btn-add-cat" class="btn-sm btn-outline">+ Add</button>
+    </div>
+    <div id="cat-list" class="cat-grid"></div>
+  </div>
+
+  <!-- FAB -->
+  <button id="fab" class="fab" title="Add transaction">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+</div>
+
+<!-- ── ADD TRANSACTION MODAL ── -->
+<div id="modal-tx" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-tx-title">Add Transaction</h3>
+      <button class="modal-close" data-close="modal-tx">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="type-toggle">
+        <button class="type-btn active" data-type="income">Income</button>
+        <button class="type-btn" data-type="expense">Expense</button>
+        <button class="type-btn" data-type="investment">Investment</button>
+      </div>
+      <input type="number" id="tx-amount" class="input" placeholder="Amount (₹)" min="0" step="0.01" />
+      <input type="text" id="tx-note" class="input" placeholder="Note (optional)" />
+      <select id="tx-category" class="input"></select>
+      <input type="date" id="tx-date" class="input" />
+      <div id="modal-tx-error" class="alert alert-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="btn-save-tx" class="btn btn-primary">Save</button>
+      <button id="btn-cancel-tx" class="btn btn-ghost" data-close="modal-tx">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD CATEGORY MODAL ── -->
+<div id="modal-cat" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add Category</h3>
+      <button class="modal-close" data-close="modal-cat">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" id="cat-name" class="input" placeholder="Category name" />
+      <div class="type-toggle">
+        <button class="type-btn active" data-cat-type="income">Income</button>
+        <button class="type-btn" data-cat-type="expense">Expense</button>
+        <button class="type-btn" data-cat-type="investment">Investment</button>
+      </div>
+      <div class="color-picker-row">
+        <label>Color</label>
+        <div id="color-swatches" class="color-swatches">
+          <span class="swatch active" data-color="#6366f1" style="background:#6366f1"></span>
+          <span class="swatch" data-color="#10b981" style="background:#10b981"></span>
+          <span class="swatch" data-color="#f59e0b" style="background:#f59e0b"></span>
+          <span class="swatch" data-color="#ef4444" style="background:#ef4444"></span>
+          <span class="swatch" data-color="#3b82f6" style="background:#3b82f6"></span>
+          <span class="swatch" data-color="#8b5cf6" style="background:#8b5cf6"></span>
+          <span class="swatch" data-color="#ec4899" style="background:#ec4899"></span>
+          <span class="swatch" data-color="#14b8a6" style="background:#14b8a6"></span>
+        </div>
+      </div>
+      <div id="modal-cat-error" class="alert alert-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="btn-save-cat" class="btn btn-primary">Save Category</button>
+      <button class="btn btn-ghost" data-close="modal-cat">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── DELETE CONFIRM MODAL ── -->
+<div id="modal-del" class="modal-overlay hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header"><h3>Delete Transaction?</h3></div>
+    <div class="modal-body"><p>This cannot be undone.</p></div>
+    <div class="modal-footer">
+      <button id="btn-confirm-del" class="btn btn-danger">Delete</button>
+      <button class="btn btn-ghost" data-close="modal-del">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module" src="js/firebase-config.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
