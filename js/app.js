@@ -1,4 +1,4 @@
-// ── FlowTrack – Main App ──────────────────────────────────────────────────────
+// ── Pulse – Main App ──────────────────────────────────────────────────────
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -419,7 +419,7 @@ window.addEventListener('beforeinstallprompt', e => {
   if (!$('install-banner')) {
     const banner = document.createElement('div');
     banner.id = 'install-banner';
-    banner.innerHTML = `<span>📲 Add FlowTrack to home screen</span>
+    banner.innerHTML = `<span>📲 Add Pulse to home screen</span>
       <button class="btn btn-primary" id="btn-install">Install</button>
       <button class="btn btn-ghost" id="btn-dismiss-install">✕</button>`;
     document.body.appendChild(banner);
