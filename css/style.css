@@ -538,3 +538,23 @@ select.input { cursor: pointer; }
   line-height: 1.5;
 }
 .auth-domain-tip a { color: var(--primary-h); }
+
+/* ── Debug Log ── */
+.debug-log {
+  width: 100%;
+  max-width: 400px;
+  margin: 16px auto 0;
+  background: #0a0e14;
+  border: 1px solid #1e3040;
+  border-radius: 8px;
+  padding: 10px 12px;
+  max-height: 160px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  min-height: 40px;
+}
+.debug-log:empty::before {
+  content: 'Initialising Firebase…';
+  color: #6b8fa3;
+  font-size: 11px;
+}
