@@ -1,8 +1,8 @@
-const CACHE = 'flowtrack-v1';
+const CACHE = 'pulse-v1';
 const ASSETS = [
   '/', '/index.html', '/css/style.css',
   '/js/app.js', '/js/firebase-config.js',
-  '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'
+  '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/pulse.gif'
 ];
 
 self.addEventListener('install', e => {
