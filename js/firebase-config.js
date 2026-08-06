@@ -3,7 +3,8 @@
 //  Firebase project config (Project Settings →
 //  Your apps → Web app → Config snippet)
 // ─────────────────────────────────────────────
-const firebaseConfig = {
+
+export const firebaseConfig = {
   apiKey: "AIzaSyDYLXUPR77jqxZZFKUHUC-LeRqdHUZcIQs",
   authDomain: "pulse-tracker-f03b7.firebaseapp.com",
   projectId: "pulse-tracker-f03b7",
