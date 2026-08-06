@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0a0e14" />
-  <meta name="description" content="Track your income, expenses, and investments with category breakdowns." />
+  <meta name="description" content="Track your income, expenses, and investments." />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Pulse" />
@@ -16,7 +16,9 @@
 </head>
 <body>
 
-<!-- ── AUTH SCREEN ── -->
+<!-- ══════════════════════════════════════════
+     AUTH SCREEN
+     ══════════════════════════════════════════ -->
 <div id="auth-screen" class="screen">
 
   <div class="auth-hero">
@@ -30,6 +32,7 @@
   <div class="auth-card">
     <div id="auth-error" class="alert alert-error hidden"></div>
 
+    <!-- Login -->
     <div id="login-form">
       <h2>Sign in</h2>
       <button id="btn-google" class="btn btn-google">
@@ -42,12 +45,13 @@
         Continue with Google
       </button>
       <div class="divider"><span>or</span></div>
-      <input type="email"    id="email"    class="input" placeholder="Email address" autocomplete="email" />
-      <input type="password" id="password" class="input" placeholder="Password"      autocomplete="current-password" />
+      <input type="email"    id="email"    class="input" placeholder="Email address"  autocomplete="email" />
+      <input type="password" id="password" class="input" placeholder="Password"       autocomplete="current-password" />
       <button id="btn-signin" class="btn btn-primary">Sign In</button>
       <p class="auth-switch">No account? <a href="#" id="to-signup">Create one</a></p>
     </div>
 
+    <!-- Sign up -->
     <div id="signup-form" class="hidden">
       <h2>Create account</h2>
       <input type="text"     id="signup-name"     class="input" placeholder="Your name" />
@@ -56,10 +60,17 @@
       <button id="btn-signup" class="btn btn-primary">Create Account</button>
       <p class="auth-switch">Have an account? <a href="#" id="to-login">Sign in</a></p>
     </div>
-  </div>
-</div>
+  </div><!-- /.auth-card -->
 
-<!-- ── APP SHELL ── -->
+  <!-- Debug log — shows Firebase errors on-screen -->
+  <div id="debug-log" class="debug-log"></div>
+
+</div><!-- /#auth-screen -->
+
+
+<!-- ══════════════════════════════════════════
+     APP SHELL
+     ══════════════════════════════════════════ -->
 <div id="app-screen" class="screen hidden">
 
   <!-- Header -->
@@ -168,15 +179,19 @@
 
   <!-- FAB -->
   <button id="fab" class="fab" title="Add transaction">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
   </button>
-</div>
 
-<!-- ── ADD TRANSACTION MODAL ── -->
+</div><!-- /#app-screen -->
+
+
+<!-- ══ ADD TRANSACTION MODAL ══ -->
 <div id="modal-tx" class="modal-overlay hidden">
   <div class="modal">
     <div class="modal-header">
-      <h3 id="modal-tx-title">Add Transaction</h3>
+      <h3>Add Transaction</h3>
       <button class="modal-close" data-close="modal-tx">✕</button>
     </div>
     <div class="modal-body">
@@ -198,7 +213,7 @@
   </div>
 </div>
 
-<!-- ── ADD CATEGORY MODAL ── -->
+<!-- ══ ADD CATEGORY MODAL ══ -->
 <div id="modal-cat" class="modal-overlay hidden">
   <div class="modal">
     <div class="modal-header">
@@ -216,13 +231,13 @@
         <label>Color</label>
         <div id="color-swatches" class="color-swatches">
           <span class="swatch active" data-color="#6366f1" style="background:#6366f1"></span>
-          <span class="swatch" data-color="#10b981" style="background:#10b981"></span>
-          <span class="swatch" data-color="#f59e0b" style="background:#f59e0b"></span>
-          <span class="swatch" data-color="#ef4444" style="background:#ef4444"></span>
-          <span class="swatch" data-color="#3b82f6" style="background:#3b82f6"></span>
-          <span class="swatch" data-color="#8b5cf6" style="background:#8b5cf6"></span>
-          <span class="swatch" data-color="#ec4899" style="background:#ec4899"></span>
-          <span class="swatch" data-color="#14b8a6" style="background:#14b8a6"></span>
+          <span class="swatch" data-color="#10b981"  style="background:#10b981"></span>
+          <span class="swatch" data-color="#f59e0b"  style="background:#f59e0b"></span>
+          <span class="swatch" data-color="#ef4444"  style="background:#ef4444"></span>
+          <span class="swatch" data-color="#3b82f6"  style="background:#3b82f6"></span>
+          <span class="swatch" data-color="#8b5cf6"  style="background:#8b5cf6"></span>
+          <span class="swatch" data-color="#ec4899"  style="background:#ec4899"></span>
+          <span class="swatch" data-color="#14b8a6"  style="background:#14b8a6"></span>
         </div>
       </div>
       <div id="modal-cat-error" class="alert alert-error hidden"></div>
@@ -234,7 +249,7 @@
   </div>
 </div>
 
-<!-- ── DELETE CONFIRM MODAL ── -->
+<!-- ══ DELETE CONFIRM ══ -->
 <div id="modal-del" class="modal-overlay hidden">
   <div class="modal modal-sm">
     <div class="modal-header"><h3>Delete Transaction?</h3></div>
@@ -246,7 +261,6 @@
   </div>
 </div>
 
-<script type="module" src="js/firebase-config.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
