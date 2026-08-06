@@ -3,13 +3,13 @@
 //  Firebase project config (Project Settings →
 //  Your apps → Web app → Config snippet)
 // ─────────────────────────────────────────────
-const firebaseConfig = {
-  apiKey: "AIzaSyDYLXUPR77jqxZZFKUHUC-LeRqdHUZcIQs",
-  authDomain: "pulse-tracker-f03b7.firebaseapp.com",
-  projectId: "pulse-tracker-f03b7",
-  storageBucket: "pulse-tracker-f03b7.firebasestorage.app",
-  messagingSenderId: "840165267942",
-  appId: "1:840165267942:web:a64626be802176fd809e27"
+export const firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 
 // ─────────────────────────────────────────────
