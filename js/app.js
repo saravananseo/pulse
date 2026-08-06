@@ -12,12 +12,55 @@ import {
   onSnapshot, query, orderBy, serverTimestamp, getDocs
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
+// ── Debug logger (visible on screen) ─────────────────────────────────────────
+const debugLines = [];
+function dbg(msg, isError = false) {
+  const ts = new Date().toLocaleTimeString();
+  const line = `[${ts}] ${msg}`;
+  debugLines.push({ line, isError });
+  console[isError ? 'error' : 'log']('[Pulse]', msg);
+  renderDebug();
+}
+function renderDebug() {
+  const el = document.getElementById('debug-log');
+  if (!el) return;
+  el.innerHTML = debugLines.slice(-12).map(({ line, isError }) =>
+    `<div style="color:${isError ? '#f87171' : '#86efac'};font-size:11px;margin-bottom:2px">${line}</div>`
+  ).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── Validate config before doing anything ────────────────────────────────────
+function validateConfig() {
+  const required = ['apiKey','authDomain','projectId'];
+  for (const key of required) {
+    const val = firebaseConfig[key];
+    if (!val || val.startsWith('YOUR_')) {
+      return `firebase-config.js not set up: "${key}" is still a placeholder. Open js/firebase-config.js and paste your real Firebase config.`;
+    }
+  }
+  return null;
+}
+
+const configError = validateConfig();
+if (configError) {
+  document.getElementById('auth-error').textContent = configError;
+  document.getElementById('auth-error').classList.remove('hidden');
+  dbg('CONFIG ERROR: ' + configError, true);
+  throw new Error(configError);
+}
+
+dbg(`Config OK — project: ${firebaseConfig.projectId}`);
+dbg(`Auth domain: ${firebaseConfig.authDomain}`);
+dbg(`Page origin: ${location.origin}`);
+
 // ── Init ──────────────────────────────────────────────────────────────────────
-const app      = initializeApp(firebaseConfig);
-const auth     = getAuth(app);
-const db       = getFirestore(app);
+const app       = initializeApp(firebaseConfig);
+const auth      = getAuth(app);
+const db        = getFirestore(app);
 const gProvider = new GoogleAuthProvider();
 gProvider.setCustomParameters({ prompt: 'select_account' });
+dbg('Firebase initialised');
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentUser    = null;
@@ -51,14 +94,15 @@ function showError(elId, msg) {
   const el = $(elId);
   el.textContent = msg;
   el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 6000);
+  setTimeout(() => el.classList.add('hidden'), 8000);
 }
 
 function setGoogleBtn(loading) {
   const btn = $('btn-google');
+  if (!btn) return;
   btn.disabled = loading;
   btn.innerHTML = loading
-    ? `<span class="spinner"></span> Redirecting to Google…`
+    ? `<span class="spinner"></span> Going to Google…`
     : `<svg width="20" height="20" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -67,62 +111,65 @@ function setGoogleBtn(loading) {
       </svg> Continue with Google`;
 }
 
-// ── Boot: handle redirect result FIRST, then set up auth listener ─────────────
+// ── BOOT — getRedirectResult first, then auth listener ───────────────────────
 async function boot() {
-  // Check if we're returning from a Google redirect
+  dbg('boot() started');
+
+  // Step 1: Check if returning from Google redirect
   try {
+    dbg('Calling getRedirectResult…');
     const result = await getRedirectResult(auth);
     if (result?.user) {
-      // onAuthStateChanged below will pick this up automatically
-      console.log('[Pulse] Google redirect sign-in OK:', result.user.email);
+      dbg(`Redirect sign-in success: ${result.user.email}`);
+    } else {
+      dbg('No redirect result (fresh load)');
     }
   } catch (err) {
-    console.error('[Pulse] getRedirectResult error:', err.code, err.message);
-    // Show the error once the auth screen is visible
-    setTimeout(() => showError('auth-error', friendlyError(err.code)), 500);
+    dbg(`getRedirectResult error: ${err.code} — ${err.message}`, true);
+    setTimeout(() => showError('auth-error', friendlyError(err.code) + `\n\nCode: ${err.code}`), 300);
   }
 
-  // Now listen for auth state
+  // Step 2: Listen for auth state changes
+  dbg('Setting up onAuthStateChanged…');
   onAuthStateChanged(auth, async user => {
+    dbg(`Auth state changed: ${user ? user.email : 'signed out'}`);
     if (user) {
       currentUser = user;
       setGoogleBtn(false);
       $('user-name').textContent = user.displayName || user.email.split('@')[0];
-      hide('auth-screen');
-      $('auth-screen').classList.remove('active');
-      show('app-screen');
-      $('app-screen').classList.add('active');
+      $('auth-screen').classList.add('hidden');
+      $('app-screen').classList.remove('hidden');
       await ensureDefaultCategories();
       subscribeData();
     } else {
       currentUser = null;
       unsubs.forEach(u => u());
       unsubs = []; transactions = []; categories = [];
-      hide('app-screen');
-      $('app-screen').classList.remove('active');
-      show('auth-screen');
-      $('auth-screen').classList.add('active');
+      $('app-screen').classList.add('hidden');
+      $('auth-screen').classList.remove('hidden');
       setGoogleBtn(false);
     }
   });
 }
 
-boot();
+boot().catch(err => dbg('boot() crashed: ' + err.message, true));
 
 // ── Auth UI ───────────────────────────────────────────────────────────────────
 $('to-signup').addEventListener('click', e => { e.preventDefault(); hide('login-form');  show('signup-form'); });
 $('to-login') .addEventListener('click', e => { e.preventDefault(); hide('signup-form'); show('login-form');  });
 
-// Google — always use redirect (most reliable across all browsers & hosts)
 $('btn-google').addEventListener('click', () => {
+  dbg('Google button clicked');
   setGoogleBtn(true);
   hide('auth-error');
-  // signInWithRedirect navigates away; result is handled in boot() on return
-  signInWithRedirect(auth, gProvider).catch(err => {
-    console.error('[Pulse] signInWithRedirect error:', err);
-    setGoogleBtn(false);
-    showError('auth-error', friendlyError(err.code));
-  });
+
+  signInWithRedirect(auth, gProvider)
+    .then(() => dbg('signInWithRedirect called — navigating…'))
+    .catch(err => {
+      dbg(`signInWithRedirect failed: ${err.code} — ${err.message}`, true);
+      setGoogleBtn(false);
+      showError('auth-error', friendlyError(err.code) + `\n\nError code: ${err.code}`);
+    });
 });
 
 $('btn-signin').addEventListener('click', async () => {
@@ -130,8 +177,10 @@ $('btn-signin').addEventListener('click', async () => {
   const pass  = $('password').value;
   if (!email || !pass) return showError('auth-error', 'Enter your email and password.');
   try {
+    dbg(`Email sign-in: ${email}`);
     await signInWithEmailAndPassword(auth, email, pass);
   } catch (e) {
+    dbg(`Email sign-in error: ${e.code}`, true);
     showError('auth-error', friendlyError(e.code));
   }
 });
@@ -144,33 +193,39 @@ $('btn-signup').addEventListener('click', async () => {
   if (!email) return showError('auth-error', 'Please enter your email.');
   if (!pass)  return showError('auth-error', 'Please enter a password.');
   try {
+    dbg(`Creating account: ${email}`);
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     await updateProfile(cred.user, { displayName: name });
   } catch (e) {
+    dbg(`Signup error: ${e.code}`, true);
     showError('auth-error', friendlyError(e.code));
   }
 });
 
-$('btn-signout').addEventListener('click', () => signOut(auth));
+$('btn-signout').addEventListener('click', () => {
+  dbg('Signing out');
+  signOut(auth);
+});
 
 function friendlyError(code) {
   const map = {
-    'auth/wrong-password':                  'Incorrect password.',
-    'auth/invalid-credential':              'Incorrect email or password.',
-    'auth/user-not-found':                  'No account found with this email.',
-    'auth/email-already-in-use':            'Email already registered. Sign in instead.',
-    'auth/weak-password':                   'Password must be at least 6 characters.',
-    'auth/invalid-email':                   'Invalid email address.',
-    'auth/too-many-requests':               'Too many attempts. Try again later.',
-    'auth/network-request-failed':          'Network error. Check your connection.',
-    'auth/unauthorized-domain':             '⚠️ Domain not authorised. Go to Firebase → Authentication → Settings → Authorised domains and add this domain.',
-    'auth/operation-not-allowed':           '⚠️ Google sign-in is not enabled. Go to Firebase → Authentication → Sign-in method → Google and enable it.',
-    'auth/invalid-api-key':                 '⚠️ Invalid Firebase API key. Check your firebase-config.js.',
-    'auth/app-not-authorized':              '⚠️ App not authorised. Check your Firebase project settings.',
-    'auth/redirect-cancelled-by-user':      'Sign-in was cancelled.',
-    'auth/internal-error':                  'Internal error. Please try again.',
+    'auth/wrong-password':           'Incorrect password.',
+    'auth/invalid-credential':       'Incorrect email or password.',
+    'auth/user-not-found':           'No account found with this email.',
+    'auth/email-already-in-use':     'Email already registered. Sign in instead.',
+    'auth/weak-password':            'Password must be at least 6 characters.',
+    'auth/invalid-email':            'Invalid email address.',
+    'auth/too-many-requests':        'Too many attempts. Try again later.',
+    'auth/network-request-failed':   'Network error. Check your internet connection.',
+    'auth/unauthorized-domain':      '⚠️ This domain is not authorised. Firebase Console → Authentication → Settings → Authorised domains → Add this domain.',
+    'auth/operation-not-allowed':    '⚠️ Google sign-in not enabled. Firebase Console → Authentication → Sign-in method → Google → Enable.',
+    'auth/invalid-api-key':          '⚠️ Invalid API key. Check your firebase-config.js.',
+    'auth/app-not-authorized':       '⚠️ App not authorised. Check your Firebase project settings.',
+    'auth/redirect-cancelled-by-user': 'Sign-in was cancelled.',
+    'auth/internal-error':           'Internal Firebase error. See debug log below.',
+    'auth/missing-or-invalid-nonce': 'Auth configuration error. Try email/password sign-in instead.',
   };
-  return map[code] || `Sign-in error (${code}). Check the browser console for details.`;
+  return map[code] || `Firebase error: ${code}`;
 }
 
 // ── Firestore ─────────────────────────────────────────────────────────────────
@@ -180,6 +235,7 @@ const catCol = () => collection(db, 'users', currentUser.uid, 'categories');
 async function ensureDefaultCategories() {
   const snap = await getDocs(catCol());
   if (snap.empty) {
+    dbg('Seeding default categories…');
     for (const c of DEFAULT_CATS) {
       await addDoc(catCol(), { ...c, createdAt: serverTimestamp() });
     }
@@ -187,16 +243,19 @@ async function ensureDefaultCategories() {
 }
 
 function subscribeData() {
+  dbg('Subscribing to Firestore…');
   const u1 = onSnapshot(
     query(txCol(), orderBy('date','desc'), orderBy('createdAt','desc')),
-    snap => { transactions = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); }
+    snap => { transactions = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); },
+    err => dbg('TX snapshot error: ' + err.message, true)
   );
   const u2 = onSnapshot(
     query(catCol(), orderBy('name')),
     snap => {
       categories = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderCategories(); renderCategoryFilter(); renderCategorySelect(); renderAll();
-    }
+    },
+    err => dbg('CAT snapshot error: ' + err.message, true)
   );
   unsubs.push(u1, u2);
 }
@@ -242,14 +301,13 @@ function renderSummary() {
   $('total-expense').textContent = fmt(t.expense);
   $('total-invest') .textContent = fmt(t.investment);
   const net = t.income - t.expense - t.investment;
-  $('total-net').textContent   = (net < 0 ? '-' : '') + fmt(net);
-  $('total-net').style.color   = net < 0 ? 'var(--expense)' : 'var(--income)';
+  $('total-net').textContent = (net < 0 ? '-' : '') + fmt(net);
+  $('total-net').style.color = net < 0 ? 'var(--expense)' : 'var(--income)';
 }
 
 function renderDashboard() {
   const period = $('period-filter').value;
   const txs    = filterByPeriod(transactions, period);
-
   const catTotals = {};
   txs.forEach(t => {
     if (!catTotals[t.category]) catTotals[t.category] = { amount:0, type:t.type, color:'#6366f1' };
@@ -257,11 +315,9 @@ function renderDashboard() {
     const cat = categories.find(c => c.name === t.category);
     if (cat) catTotals[t.category].color = cat.color;
   });
-
   const sorted = Object.entries(catTotals).sort((a,b) => b[1].amount - a[1].amount);
   const maxAmt = sorted[0]?.[1].amount || 1;
   const barsEl = $('category-bars');
-
   barsEl.innerHTML = !sorted.length
     ? '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:24px 0">No data for this period.</p>'
     : sorted.map(([name, d]) => `
@@ -358,7 +414,6 @@ function renderCategories() {
       </div>
       <button class="cat-del-btn" data-id="${c.id}">✕</button>
     </div>`).join('');
-
   document.querySelectorAll('.cat-del-btn').forEach(btn =>
     btn.addEventListener('click', async () => {
       if (!confirm('Delete this category?')) return;
