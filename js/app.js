@@ -4,57 +4,44 @@ import { initializeApp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signInWithRedirect, getRedirectResult,
-  GoogleAuthProvider, signOut, onAuthStateChanged, updateProfile
+  signInWithPopup, GoogleAuthProvider,
+  signOut, onAuthStateChanged, updateProfile,
+  browserLocalPersistence, setPersistence
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
   getFirestore, collection, doc, addDoc, deleteDoc,
   onSnapshot, query, orderBy, serverTimestamp, getDocs
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-// ── Debug logger (visible on screen) ─────────────────────────────────────────
+// ── Debug logger ──────────────────────────────────────────────────────────────
 const debugLines = [];
 function dbg(msg, isError = false) {
   const ts = new Date().toLocaleTimeString();
-  const line = `[${ts}] ${msg}`;
-  debugLines.push({ line, isError });
+  debugLines.push({ line: `[${ts}] ${msg}`, isError });
   console[isError ? 'error' : 'log']('[Pulse]', msg);
-  renderDebug();
-}
-function renderDebug() {
   const el = document.getElementById('debug-log');
   if (!el) return;
-  el.innerHTML = debugLines.slice(-12).map(({ line, isError }) =>
+  el.innerHTML = debugLines.slice(-14).map(({ line, isError }) =>
     `<div style="color:${isError ? '#f87171' : '#86efac'};font-size:11px;margin-bottom:2px">${line}</div>`
   ).join('');
   el.scrollTop = el.scrollHeight;
 }
 
-// ── Validate config before doing anything ────────────────────────────────────
-function validateConfig() {
-  const required = ['apiKey','authDomain','projectId'];
-  for (const key of required) {
-    const val = firebaseConfig[key];
-    if (!val || val.startsWith('YOUR_')) {
-      return `firebase-config.js not set up: "${key}" is still a placeholder. Open js/firebase-config.js and paste your real Firebase config.`;
-    }
+// ── Validate config ───────────────────────────────────────────────────────────
+const required = ['apiKey','authDomain','projectId'];
+for (const key of required) {
+  if (!firebaseConfig[key] || firebaseConfig[key].startsWith('YOUR_')) {
+    const msg = `firebase-config.js not configured: "${key}" is still a placeholder.`;
+    document.getElementById('auth-error').textContent = msg;
+    document.getElementById('auth-error').classList.remove('hidden');
+    throw new Error(msg);
   }
-  return null;
-}
-
-const configError = validateConfig();
-if (configError) {
-  document.getElementById('auth-error').textContent = configError;
-  document.getElementById('auth-error').classList.remove('hidden');
-  dbg('CONFIG ERROR: ' + configError, true);
-  throw new Error(configError);
 }
 
 dbg(`Config OK — project: ${firebaseConfig.projectId}`);
-dbg(`Auth domain: ${firebaseConfig.authDomain}`);
-dbg(`Page origin: ${location.origin}`);
+dbg(`Host: ${location.host}`);
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ── Init Firebase ─────────────────────────────────────────────────────────────
 const app       = initializeApp(firebaseConfig);
 const auth      = getAuth(app);
 const db        = getFirestore(app);
@@ -102,7 +89,7 @@ function setGoogleBtn(loading) {
   if (!btn) return;
   btn.disabled = loading;
   btn.innerHTML = loading
-    ? `<span class="spinner"></span> Going to Google…`
+    ? `<span class="spinner"></span> Opening Google…`
     : `<svg width="20" height="20" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -111,65 +98,85 @@ function setGoogleBtn(loading) {
       </svg> Continue with Google`;
 }
 
-// ── BOOT — getRedirectResult first, then auth listener ───────────────────────
+// ── Screen helpers ────────────────────────────────────────────────────────────
+function showApp(user) {
+  dbg(`Entering app as: ${user.email}`);
+  currentUser = user;
+  $('user-name').textContent = user.displayName || user.email.split('@')[0];
+  $('auth-screen').classList.add('hidden');
+  $('app-screen').classList.remove('hidden');
+  setGoogleBtn(false);
+}
+
+function showAuth() {
+  dbg('Showing auth screen');
+  currentUser = null;
+  unsubs.forEach(u => u());
+  unsubs = []; transactions = []; categories = [];
+  $('app-screen').classList.add('hidden');
+  $('auth-screen').classList.remove('hidden');
+  setGoogleBtn(false);
+}
+
+// ── BOOT ─────────────────────────────────────────────────────────────────────
+// Key insight: signInWithPopup resolves immediately in the same JS context,
+// so we don't need getRedirectResult at all. Switch fully to popup which
+// works fine on GitHub Pages / Netlify over HTTPS.
+// The only remaining auth listener handles email/password + persisted sessions.
+
 async function boot() {
-  dbg('boot() started');
+  dbg('boot() — setting persistence to LOCAL');
 
-  // Step 1: Check if returning from Google redirect
-  try {
-    dbg('Calling getRedirectResult…');
-    const result = await getRedirectResult(auth);
-    if (result?.user) {
-      dbg(`Redirect sign-in success: ${result.user.email}`);
-    } else {
-      dbg('No redirect result (fresh load)');
-    }
-  } catch (err) {
-    dbg(`getRedirectResult error: ${err.code} — ${err.message}`, true);
-    setTimeout(() => showError('auth-error', friendlyError(err.code) + `\n\nCode: ${err.code}`), 300);
-  }
+  // Ensure session persists across page loads
+  await setPersistence(auth, browserLocalPersistence);
+  dbg('Persistence set');
 
-  // Step 2: Listen for auth state changes
-  dbg('Setting up onAuthStateChanged…');
+  // Listen for auth state — this handles:
+  // 1. Returning users (already signed in via localStorage)
+  // 2. Successful popup sign-in
+  // 3. Email/password sign-in
   onAuthStateChanged(auth, async user => {
-    dbg(`Auth state changed: ${user ? user.email : 'signed out'}`);
+    dbg(`onAuthStateChanged: ${user ? user.email : 'null (signed out)'}`);
     if (user) {
-      currentUser = user;
-      setGoogleBtn(false);
-      $('user-name').textContent = user.displayName || user.email.split('@')[0];
-      $('auth-screen').classList.add('hidden');
-      $('app-screen').classList.remove('hidden');
+      showApp(user);
       await ensureDefaultCategories();
       subscribeData();
     } else {
-      currentUser = null;
-      unsubs.forEach(u => u());
-      unsubs = []; transactions = []; categories = [];
-      $('app-screen').classList.add('hidden');
-      $('auth-screen').classList.remove('hidden');
-      setGoogleBtn(false);
+      showAuth();
     }
   });
 }
 
-boot().catch(err => dbg('boot() crashed: ' + err.message, true));
+boot().catch(err => dbg('boot() error: ' + err.message, true));
 
 // ── Auth UI ───────────────────────────────────────────────────────────────────
 $('to-signup').addEventListener('click', e => { e.preventDefault(); hide('login-form');  show('signup-form'); });
 $('to-login') .addEventListener('click', e => { e.preventDefault(); hide('signup-form'); show('login-form');  });
 
-$('btn-google').addEventListener('click', () => {
-  dbg('Google button clicked');
+// ── Google sign-in via POPUP (works on GitHub Pages / Netlify over HTTPS) ────
+$('btn-google').addEventListener('click', async () => {
+  dbg('Google button clicked — opening popup');
   setGoogleBtn(true);
   hide('auth-error');
 
-  signInWithRedirect(auth, gProvider)
-    .then(() => dbg('signInWithRedirect called — navigating…'))
-    .catch(err => {
-      dbg(`signInWithRedirect failed: ${err.code} — ${err.message}`, true);
-      setGoogleBtn(false);
-      showError('auth-error', friendlyError(err.code) + `\n\nError code: ${err.code}`);
-    });
+  try {
+    const result = await signInWithPopup(auth, gProvider);
+    dbg(`Popup sign-in OK: ${result.user.email}`);
+    // onAuthStateChanged will fire automatically and call showApp()
+  } catch (err) {
+    dbg(`Popup error: ${err.code}`, true);
+    setGoogleBtn(false);
+
+    if (err.code === 'auth/popup-blocked') {
+      // Popup was blocked by browser — tell user to allow popups
+      showError('auth-error',
+        '🚫 Popup was blocked by your browser.\n' +
+        'Please allow popups for this site:\n' +
+        'Click the popup-blocked icon in your address bar → Always allow.');
+    } else {
+      showError('auth-error', friendlyError(err.code) + `  [${err.code}]`);
+    }
+  }
 });
 
 $('btn-signin').addEventListener('click', async () => {
@@ -180,7 +187,7 @@ $('btn-signin').addEventListener('click', async () => {
     dbg(`Email sign-in: ${email}`);
     await signInWithEmailAndPassword(auth, email, pass);
   } catch (e) {
-    dbg(`Email sign-in error: ${e.code}`, true);
+    dbg(`Email error: ${e.code}`, true);
     showError('auth-error', friendlyError(e.code));
   }
 });
@@ -209,23 +216,22 @@ $('btn-signout').addEventListener('click', () => {
 
 function friendlyError(code) {
   const map = {
-    'auth/wrong-password':           'Incorrect password.',
-    'auth/invalid-credential':       'Incorrect email or password.',
-    'auth/user-not-found':           'No account found with this email.',
-    'auth/email-already-in-use':     'Email already registered. Sign in instead.',
-    'auth/weak-password':            'Password must be at least 6 characters.',
-    'auth/invalid-email':            'Invalid email address.',
-    'auth/too-many-requests':        'Too many attempts. Try again later.',
-    'auth/network-request-failed':   'Network error. Check your internet connection.',
-    'auth/unauthorized-domain':      '⚠️ This domain is not authorised. Firebase Console → Authentication → Settings → Authorised domains → Add this domain.',
-    'auth/operation-not-allowed':    '⚠️ Google sign-in not enabled. Firebase Console → Authentication → Sign-in method → Google → Enable.',
-    'auth/invalid-api-key':          '⚠️ Invalid API key. Check your firebase-config.js.',
-    'auth/app-not-authorized':       '⚠️ App not authorised. Check your Firebase project settings.',
-    'auth/redirect-cancelled-by-user': 'Sign-in was cancelled.',
-    'auth/internal-error':           'Internal Firebase error. See debug log below.',
-    'auth/missing-or-invalid-nonce': 'Auth configuration error. Try email/password sign-in instead.',
+    'auth/wrong-password':             'Incorrect password.',
+    'auth/invalid-credential':         'Incorrect email or password.',
+    'auth/user-not-found':             'No account found with this email.',
+    'auth/email-already-in-use':       'Email already registered. Sign in instead.',
+    'auth/weak-password':              'Password must be at least 6 characters.',
+    'auth/invalid-email':              'Invalid email address.',
+    'auth/too-many-requests':          'Too many attempts. Try again later.',
+    'auth/network-request-failed':     'Network error. Check your internet connection.',
+    'auth/unauthorized-domain':        '⚠️ Domain not authorised in Firebase.\nGo to Firebase Console → Authentication → Settings → Authorised domains → Add: ' + location.host,
+    'auth/operation-not-allowed':      '⚠️ Google sign-in not enabled.\nFirebase Console → Authentication → Sign-in method → Google → Enable.',
+    'auth/invalid-api-key':            '⚠️ Invalid API key in firebase-config.js.',
+    'auth/popup-closed-by-user':       'Sign-in cancelled.',
+    'auth/cancelled-popup-request':    'Sign-in cancelled.',
+    'auth/internal-error':             'Firebase internal error. Check console.',
   };
-  return map[code] || `Firebase error: ${code}`;
+  return map[code] || `Error: ${code}`;
 }
 
 // ── Firestore ─────────────────────────────────────────────────────────────────
@@ -235,7 +241,7 @@ const catCol = () => collection(db, 'users', currentUser.uid, 'categories');
 async function ensureDefaultCategories() {
   const snap = await getDocs(catCol());
   if (snap.empty) {
-    dbg('Seeding default categories…');
+    dbg('Seeding default categories');
     for (const c of DEFAULT_CATS) {
       await addDoc(catCol(), { ...c, createdAt: serverTimestamp() });
     }
@@ -243,11 +249,11 @@ async function ensureDefaultCategories() {
 }
 
 function subscribeData() {
-  dbg('Subscribing to Firestore…');
+  dbg('Subscribing to Firestore');
   const u1 = onSnapshot(
     query(txCol(), orderBy('date','desc'), orderBy('createdAt','desc')),
     snap => { transactions = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); },
-    err => dbg('TX snapshot error: ' + err.message, true)
+    err  => dbg('TX error: ' + err.message, true)
   );
   const u2 = onSnapshot(
     query(catCol(), orderBy('name')),
@@ -255,7 +261,7 @@ function subscribeData() {
       categories = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderCategories(); renderCategoryFilter(); renderCategorySelect(); renderAll();
     },
-    err => dbg('CAT snapshot error: ' + err.message, true)
+    err => dbg('CAT error: ' + err.message, true)
   );
   unsubs.push(u1, u2);
 }
@@ -317,8 +323,7 @@ function renderDashboard() {
   });
   const sorted = Object.entries(catTotals).sort((a,b) => b[1].amount - a[1].amount);
   const maxAmt = sorted[0]?.[1].amount || 1;
-  const barsEl = $('category-bars');
-  barsEl.innerHTML = !sorted.length
+  $('category-bars').innerHTML = !sorted.length
     ? '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:24px 0">No data for this period.</p>'
     : sorted.map(([name, d]) => `
         <div class="cat-bar-item">
