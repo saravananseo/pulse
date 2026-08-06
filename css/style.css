@@ -31,12 +31,12 @@ body {
 /* ── Screens ── */
 .screen { width: 100%; min-height: 100dvh; }
 .screen.hidden { display: none !important; }
-.screen.active { display: block; }
+
+#auth-screen { display: flex; flex-direction: column; }
+#app-screen  { display: block; }
 
 /* ── Auth ── */
 #auth-screen {
-  display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 24px 20px;
