@@ -2,7 +2,8 @@
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-         signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged,
+         signInWithPopup, signInWithRedirect, getRedirectResult,
+         GoogleAuthProvider, signOut, onAuthStateChanged,
          updateProfile }            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, collection, doc, addDoc, deleteDoc, onSnapshot,
          query, orderBy, serverTimestamp, setDoc, getDocs }
@@ -13,6 +14,7 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 const gProvider = new GoogleAuthProvider();
+gProvider.setCustomParameters({ prompt: 'select_account' });
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentUser   = null;
@@ -47,20 +49,71 @@ function showError(elId, msg) {
   const el = $(elId);
   el.textContent = msg;
   el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 4000);
+  setTimeout(() => el.classList.add('hidden'), 5000);
 }
+
+function setGoogleBtnLoading(loading) {
+  const btn = $('btn-google');
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? '<span class="spinner"></span> Signing in...'
+    : `<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Continue with Google`;
+}
+
+// ── Handle redirect result on page load ───────────────────────────────────────
+// This fires after Google redirects back to the app
+getRedirectResult(auth)
+  .then(result => {
+    if (result?.user) {
+      // Signed in via redirect — onAuthStateChanged will handle the rest
+      console.log('Redirect sign-in success:', result.user.email);
+    }
+  })
+  .catch(err => {
+    console.error('Redirect error:', err);
+    if (err.code !== 'auth/no-current-user') {
+      showError('auth-error', friendlyError(err.code));
+    }
+  });
 
 // ── Auth Screens ──────────────────────────────────────────────────────────────
 $('to-signup').addEventListener('click', e => { e.preventDefault(); hide('login-form');  show('signup-form'); });
 $('to-login') .addEventListener('click', e => { e.preventDefault(); hide('signup-form'); show('login-form');  });
 
 $('btn-google').addEventListener('click', async () => {
-  try { await signInWithPopup(auth, gProvider); }
-  catch(e) { showError('auth-error', e.message); }
+  setGoogleBtnLoading(true);
+  hide('auth-error');
+  try {
+    // Try popup first — works best on desktop browsers
+    await signInWithPopup(auth, gProvider);
+  } catch (popupErr) {
+    console.warn('Popup blocked or failed:', popupErr.code);
+    // Popup was blocked or not supported — fall back to redirect
+    if (
+      popupErr.code === 'auth/popup-blocked' ||
+      popupErr.code === 'auth/popup-closed-by-user' ||
+      popupErr.code === 'auth/cancelled-popup-request' ||
+      popupErr.code === 'auth/operation-not-supported-in-this-environment'
+    ) {
+      try {
+        // Redirect will navigate away and come back — handled by getRedirectResult above
+        await signInWithRedirect(auth, gProvider);
+      } catch (redirectErr) {
+        setGoogleBtnLoading(false);
+        showError('auth-error', friendlyError(redirectErr.code));
+      }
+    } else {
+      setGoogleBtnLoading(false);
+      showError('auth-error', friendlyError(popupErr.code));
+    }
+  }
 });
 
 $('btn-signin').addEventListener('click', async () => {
-  try { await signInWithEmailAndPassword(auth, $('email').value.trim(), $('password').value); }
+  const email = $('email').value.trim();
+  const pass  = $('password').value;
+  if (!email || !pass) return showError('auth-error', 'Enter your email and password.');
+  try { await signInWithEmailAndPassword(auth, email, pass); }
   catch(e) { showError('auth-error', friendlyError(e.code)); }
 });
 
@@ -79,17 +132,26 @@ $('btn-signout').addEventListener('click', () => signOut(auth));
 
 function friendlyError(code) {
   const map = {
-    'auth/wrong-password':'Incorrect password.', 'auth/user-not-found':'No account found.',
-    'auth/email-already-in-use':'Email already registered.', 'auth/weak-password':'Password must be 6+ characters.',
-    'auth/invalid-email':'Invalid email address.', 'auth/too-many-requests':'Too many attempts. Try later.'
+    'auth/wrong-password':            'Incorrect password.',
+    'auth/invalid-credential':        'Incorrect email or password.',
+    'auth/user-not-found':            'No account found with this email.',
+    'auth/email-already-in-use':      'Email already registered.',
+    'auth/weak-password':             'Password must be at least 6 characters.',
+    'auth/invalid-email':             'Invalid email address.',
+    'auth/too-many-requests':         'Too many attempts. Please try again later.',
+    'auth/network-request-failed':    'Network error. Check your connection.',
+    'auth/popup-blocked':             'Popup was blocked. Trying redirect instead...',
+    'auth/unauthorized-domain':       'This domain is not authorized in Firebase. Add it in Authentication → Settings → Authorized domains.',
+    'auth/internal-error':            'An internal error occurred. Try again.',
   };
-  return map[code] || 'Something went wrong. Try again.';
+  return map[code] || `Error: ${code}`;
 }
 
 // ── Auth State ────────────────────────────────────────────────────────────────
 onAuthStateChanged(auth, async user => {
   if (user) {
     currentUser = user;
+    setGoogleBtnLoading(false);
     $('user-name').textContent = user.displayName || user.email.split('@')[0];
     $('auth-screen').classList.remove('active');
     $('auth-screen').classList.add('hidden');
@@ -106,6 +168,7 @@ onAuthStateChanged(auth, async user => {
     $('app-screen').classList.add('hidden');
     $('auth-screen').classList.remove('hidden');
     $('auth-screen').classList.add('active');
+    setGoogleBtnLoading(false);
   }
 });
 
@@ -192,7 +255,6 @@ function renderDashboard() {
   const period = $('period-filter').value;
   const txs = filterByPeriod(transactions, period);
 
-  // Category breakdown
   const catTotals = {};
   txs.forEach(t => {
     if (!catTotals[t.category]) catTotals[t.category] = { amount:0, type:t.type, color:'#6366f1' };
@@ -224,7 +286,6 @@ function renderDashboard() {
       </div>`).join('');
   }
 
-  // Recent transactions (5)
   const recent = txs.slice(0, 5);
   const recEl = $('recent-list');
   if (!recent.length) { recEl.innerHTML=''; show('empty-dash'); }
@@ -283,7 +344,6 @@ function typeIcon(type) {
   return type === 'income' ? '💰' : type === 'expense' ? '💸' : '📈';
 }
 
-// ── Render Category Filter ────────────────────────────────────────────────────
 function renderCategoryFilter() {
   const sel = $('tx-cat-filter');
   const cur = sel.value;
@@ -291,7 +351,6 @@ function renderCategoryFilter() {
     categories.map(c => `<option value="${c.name}"${c.name===cur?' selected':''}>${c.name}</option>`).join('');
 }
 
-// ── Render Category Select (in Add TX modal) ──────────────────────────────────
 function renderCategorySelect() {
   const sel = $('tx-category');
   const filtered = categories.filter(c => c.type === selectedTxType);
@@ -299,7 +358,6 @@ function renderCategorySelect() {
   if (!filtered.length) sel.innerHTML = '<option value="">No categories – add one first</option>';
 }
 
-// ── Render Categories Tab ─────────────────────────────────────────────────────
 function renderCategories() {
   $('cat-list').innerHTML = categories.map(c => `
     <div class="cat-item">
