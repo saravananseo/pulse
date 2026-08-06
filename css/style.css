@@ -516,3 +516,25 @@ select.input { cursor: pointer; }
     --border: #e2e8f0; --text: #0f172a; --text-muted: #64748b;
   }
 }
+
+/* ── Spinner for Google btn ── */
+.spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Auth domain notice ── */
+.auth-domain-tip {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 14px;
+  line-height: 1.5;
+}
+.auth-domain-tip a { color: var(--primary-h); }
