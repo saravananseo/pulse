@@ -2,20 +2,20 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:        #0f172a;
-  --bg2:       #1e293b;
-  --bg3:       #334155;
-  --border:    #334155;
-  --text:      #f1f5f9;
-  --text-muted:#94a3b8;
-  --primary:   #6366f1;
-  --primary-h: #818cf8;
-  --income:    #10b981;
-  --expense:   #ef4444;
+  --bg:        #0a0e14;
+  --bg2:       #111820;
+  --bg3:       #1a2535;
+  --border:    #1e3040;
+  --text:      #e2f4f8;
+  --text-muted:#6b8fa3;
+  --primary:   #00d4e8;
+  --primary-h: #40e8f8;
+  --income:    #00e5a0;
+  --expense:   #ff4d6a;
   --invest:    #f59e0b;
   --radius:    14px;
   --radius-sm: 8px;
-  --shadow:    0 4px 24px rgba(0,0,0,.4);
+  --shadow:    0 4px 32px rgba(0,212,232,.12);
   --font:      'Inter', system-ui, sans-serif;
 }
 
@@ -40,7 +40,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px 20px;
-  background: linear-gradient(135deg, #0f172a 0%, #1a1040 100%);
+  background: radial-gradient(ellipse at 50% 30%, #042028 0%, #0a0e14 70%);
 }
 .auth-hero { text-align: center; margin-bottom: 36px; }
 .auth-logo { margin-bottom: 16px; }
@@ -48,9 +48,26 @@ body {
   font-size: 2rem;
   font-weight: 800;
   letter-spacing: -0.03em;
-  background: linear-gradient(135deg, #818cf8, #a5f3fc);
+  background: linear-gradient(135deg, #00d4e8, #40e8f8, #00e5a0);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* ── Pulse GIF Logo ── */
+.pulse-logo-gif {
+  width: 160px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 16px;
+  display: block;
+  filter: drop-shadow(0 0 18px rgba(0,212,232,.6));
+}
+.pulse-header-gif {
+  width: 44px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 6px;
+  filter: drop-shadow(0 0 6px rgba(0,212,232,.7));
 }
 .auth-sub { color: var(--text-muted); margin-top: 8px; font-size: 0.95rem; }
 .auth-card {
@@ -113,7 +130,7 @@ select.input { cursor: pointer; }
   margin-bottom: 10px;
 }
 .btn:active { transform: scale(.98); }
-.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary { background: var(--primary); color: #0a0e14; }
 .btn-primary:hover { opacity: .9; }
 .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
 .btn-danger { background: var(--expense); color: #fff; }
@@ -369,9 +386,9 @@ select.input { cursor: pointer; }
   width: 58px; height: 58px;
   border-radius: 50%;
   background: var(--primary);
-  color: #fff;
+  color: #0a0e14;
   border: none;
-  box-shadow: 0 6px 24px rgba(99,102,241,.5);
+  box-shadow: 0 6px 24px rgba(0,212,232,.45);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -379,7 +396,7 @@ select.input { cursor: pointer; }
   z-index: 200;
   transition: transform .15s, box-shadow .15s;
 }
-.fab:hover { transform: scale(1.07); box-shadow: 0 8px 32px rgba(99,102,241,.65); }
+.fab:hover { transform: scale(1.07); box-shadow: 0 8px 32px rgba(0,212,232,.7); }
 .fab:active { transform: scale(.95); }
 
 /* ── Modals ── */
