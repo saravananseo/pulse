@@ -251,9 +251,13 @@ async function ensureDefaultCategories() {
 function subscribeData() {
   dbg('Subscribing to Firestore');
   const u1 = onSnapshot(
-    query(txCol(), orderBy('date','desc'), orderBy('createdAt','desc')),
-    snap => { transactions = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); },
-    err  => dbg('TX error: ' + err.message, true)
+    query(txCol(), orderBy('createdAt','desc')),
+    snap => {
+      dbg(`TX snapshot: ${snap.docs.length} docs`);
+      transactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderAll();
+    },
+    err => dbg('TX snapshot error: ' + err.code + ' — ' + err.message, true)
   );
   const u2 = onSnapshot(
     query(catCol(), orderBy('name')),
@@ -261,7 +265,7 @@ function subscribeData() {
       categories = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderCategories(); renderCategoryFilter(); renderCategorySelect(); renderAll();
     },
-    err => dbg('CAT error: ' + err.message, true)
+    err => dbg('CAT snapshot error: ' + err.code + ' — ' + err.message, true)
   );
   unsubs.push(u1, u2);
 }
@@ -456,13 +460,28 @@ $('btn-save-tx').addEventListener('click', async () => {
   if (!amount || amount <= 0) return showError('modal-tx-error', 'Enter a valid amount.');
   if (!date)                  return showError('modal-tx-error', 'Pick a date.');
   if (!cat)                   return showError('modal-tx-error', 'Add a category first.');
-  await addDoc(txCol(), {
-    amount, date, type: selectedTxType,
-    category: cat,
-    note: $('tx-note').value.trim(),
-    createdAt: serverTimestamp()
-  });
-  hide('modal-tx');
+
+  const btn = $('btn-save-tx');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const ref = await addDoc(txCol(), {
+      amount, date, type: selectedTxType,
+      category: cat,
+      note: $('tx-note').value.trim(),
+      createdAt: serverTimestamp()
+    });
+    dbg(`Transaction saved: ${ref.id}`);
+    hide('modal-tx');
+  } catch (err) {
+    dbg('Save TX error: ' + err.code + ' — ' + err.message, true);
+    showError('modal-tx-error', 'Failed to save: ' + err.message +
+      (err.code === 'permission-denied' ? '\n\n⚠️ Check your Firestore security rules.' : ''));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save';
+  }
 });
 
 $('btn-cancel-tx').addEventListener('click', () => hide('modal-tx'));
