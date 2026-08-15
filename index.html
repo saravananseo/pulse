@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Retirement Ledger</title>
+<meta name="description" content="A configurable retirement planning calculator — age, income, expenses, investment, growth and inflation." />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#8E6A2F" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Ledger" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #EFEAD9;
+    --paper-card: #F8F4E7;
+    --rule: #B9C3CC;
+    --margin: #9C3B45;
+    --ink: #20293A;
+    --ink-soft: #5C6472;
+    --gold: #8E6A2F;
+    --positive: #2E6B4C;
+    --negative: #9C3B45;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--paper);
+    background-image: repeating-linear-gradient(to bottom, transparent, transparent 30px, rgba(185,195,204,0.33) 31px);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  .margin-line {
+    position: fixed;
+    top: 0; bottom: 0; left: 58px; width: 2px;
+    background: var(--margin); opacity: 0.55;
+    pointer-events: none;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 36px 24px 48px 76px; }
+  @media (max-width: 640px) {
+    .margin-line { left: 26px; }
+    .wrap { padding: 28px 16px 40px 42px; }
+  }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 6px;
+  }
+  h1 {
+    font-family: 'Fraunces', serif; font-weight: 600;
+    font-size: clamp(26px, 4vw, 40px); margin: 0; letter-spacing: -0.01em;
+  }
+  .lede { font-size: 14px; color: var(--ink-soft); margin-top: 8px; max-width: 560px; line-height: 1.55; }
+
+  .card {
+    background: var(--paper-card); border: 1px solid var(--rule); border-radius: 4px;
+  }
+  .inputs-card { padding: 18px 22px; margin: 26px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; }
+  @media (max-width: 640px) { .inputs-card { grid-template-columns: 1fr; } }
+  .group-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; color: var(--gold); margin: 8px 0 2px 0; }
+  .field-row {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    padding: 10px 2px; border-bottom: 1px solid var(--rule);
+  }
+  .field-label { font-size: 13px; color: var(--ink-soft); }
+  .field-value { display: flex; align-items: baseline; gap: 6px; }
+  .rupee-sign { font-family: 'IBM Plex Mono', monospace; font-size: 15px; }
+  .field-value input {
+    text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: var(--ink);
+    background: transparent; border: none; border-bottom: 1px dashed var(--gold); outline: none; padding: 2px;
+  }
+  .field-value input.w-money { width: 118px; }
+  .field-value input.w-pct { width: 64px; }
+  .field-value input.w-age { width: 56px; }
+  .suffix { font-size: 12px; color: var(--ink-soft); min-width: 20px; }
+
+  .summary-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; margin-bottom: 28px; }
+  .stamp {
+    display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 3px solid var(--positive); border-radius: 6px; padding: 14px 22px;
+    transform: rotate(-2deg); background: rgba(255,255,255,0.35);
+  }
+  .stamp.bad { border-color: var(--negative); color: var(--negative); }
+  .stamp.good { color: var(--positive); }
+  .stamp-text { font-family: 'Fraunces', serif; font-weight: 700; font-size: 16px; letter-spacing: 0.03em; text-transform: uppercase; text-align: center; line-height: 1.25; }
+  .stamp-sub { font-family: 'Inter', sans-serif; font-size: 11px; margin-top: 4px; color: var(--ink-soft); }
+  .stat-label { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.08em; }
+  .stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 20px; }
+  .stats { display: flex; gap: 28px; }
+
+  .section-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; padding: 16px 20px 10px 20px; }
+  .chart-card { padding: 18px 12px 12px 4px; margin-bottom: 28px; }
+  .chart-card .section-title { margin-left: 8px; padding-left: 12px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    position: sticky; top: 0; background: var(--paper-card);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft);
+    padding: 8px 14px; white-space: nowrap; box-shadow: 0 1px 0 var(--rule);
+  }
+  th.left, td.left { text-align: left; }
+  th.right, td.right { text-align: right; }
+  tbody td { font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 7px 14px; border-top: 1px solid rgba(185,195,204,0.33); }
+  tbody td.phase { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--ink-soft); }
+  tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+  .table-scroll { max-height: 420px; overflow-y: auto; }
+  .neg { color: var(--negative); }
+  .bold { font-weight: 600; }
+
+  .footnote { font-size: 11px; color: var(--ink-soft); margin-top: 14px; line-height: 1.55; }
+
+  .install-banner {
+    display: none; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--gold); color: #fff; padding: 10px 16px; border-radius: 4px; margin-bottom: 22px;
+    font-size: 13px;
+  }
+  .install-banner button {
+    background: #fff; color: var(--gold); border: none; border-radius: 4px; padding: 6px 12px;
+    font-family: 'Inter', sans-serif; font-weight: 600; font-size: 12px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="margin-line"></div>
+  <div class="wrap">
+
+    <div id="installBanner" class="install-banner">
+      <span>Install this ledger on your device for offline use.</span>
+      <button id="installBtn">Install</button>
+    </div>
+
+    <div>
+      <div class="eyebrow">A Running Account</div>
+      <h1>Retirement Ledger</h1>
+      <p class="lede">Enter your numbers below. Income stays flat until you retire; expenses climb every year with inflation, before and after. Once income stops, the corpus itself pays the bills.</p>
+    </div>
+
+    <div class="card inputs-card">
+      <div>
+        <div class="group-title">Working years</div>
+        <div class="field-row">
+          <span class="field-label">Current age</span>
+          <span class="field-value"><input id="currentAge" type="number" class="w-age"><span class="suffix">yrs</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Retirement age</span>
+          <span class="field-value"><input id="retirementAge" type="number" class="w-age"><span class="suffix">yrs</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Annual income</span>
+          <span class="field-value"><span class="rupee-sign">&#8377;</span><input id="annualIncome" type="number" class="w-money"></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Annual expenses (today)</span>
+          <span class="field-value"><span class="rupee-sign">&#8377;</span><input id="annualExpenses" type="number" class="w-money"></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Existing investment corpus</span>
+          <span class="field-value"><span class="rupee-sign">&#8377;</span><input id="startingCorpus" type="number" class="w-money"></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Growth rate, pre-retirement</span>
+          <span class="field-value"><input id="growthPre" type="number" class="w-pct"><span class="suffix">%</span></span>
+        </div>
+      </div>
+      <div>
+        <div class="group-title">After retirement</div>
+        <div class="field-row">
+          <span class="field-label">Plan until age</span>
+          <span class="field-value"><input id="planUntilAge" type="number" class="w-age"><span class="suffix">yrs</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Growth rate, post-retirement</span>
+          <span class="field-value"><input id="growthPost" type="number" class="w-pct"><span class="suffix">%</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Inflation (expense growth)</span>
+          <span class="field-value"><input id="inflation" type="number" class="w-pct"><span class="suffix">%</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-row">
+      <div id="stamp" class="stamp good">
+        <div id="stampText" class="stamp-text"></div>
+        <div id="stampSub" class="stamp-sub"></div>
+      </div>
+      <div class="stats">
+        <div>
+          <div class="stat-label">Corpus at retirement</div>
+          <div id="corpusAtRetirement" class="stat-value"></div>
+        </div>
+        <div>
+          <div class="stat-label">Retirement span</div>
+          <div id="retirementSpan" class="stat-value"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card chart-card">
+      <div class="section-title">Balance, year by year</div>
+      <div id="chartHolder"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">The full account</div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th class="left">Age</th>
+              <th class="left">Phase</th>
+              <th class="right">Income</th>
+              <th class="right">Expenses</th>
+              <th class="right">Savings / Withdrawal</th>
+              <th class="right">Growth %</th>
+              <th class="right">Year-end corpus</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="footnote">Assumes income stays flat until retirement, expenses grow with inflation every year including in retirement, and the corpus compounds at the pre- or post-retirement growth rate depending on the phase. Works offline once installed. A planning model, not financial advice.</p>
+  </div>
+
+<script>
+(function () {
+  const DEFAULTS = {
+    currentAge: 40, retirementAge: 56, planUntilAge: 85,
+    annualIncome: 1200000, annualExpenses: 600000, startingCorpus: 6247508,
+    growthPre: 10, growthPost: 7, inflation: 6,
+  };
+
+  const fieldIds = Object.keys(DEFAULTS);
+  fieldIds.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = DEFAULTS[id];
+  });
+
+  function formatINR(n) {
+    const sign = n < 0 ? "-" : "";
+    const abs = Math.round(Math.abs(n));
+    return sign + "\u20B9" + abs.toLocaleString("en-IN");
+  }
+  function compactINR(n) {
+    const abs = Math.abs(n);
+    const sign = n < 0 ? "-" : "";
+    if (abs >= 10000000) return sign + "\u20B9" + (abs / 10000000).toFixed(2) + " Cr";
+    if (abs >= 100000) return sign + "\u20B9" + (abs / 100000).toFixed(2) + " L";
+    return formatINR(n);
+  }
+
+  function readInputs() {
+    const raw = {};
+    fieldIds.forEach((id) => {
+      const v = Number(document.getElementById(id).value);
+      raw[id] = Number.isFinite(v) ? v : DEFAULTS[id];
+    });
+    if (raw.retirementAge <= raw.currentAge) raw.retirementAge = raw.currentAge + 1;
+    if (raw.planUntilAge < raw.retirementAge) raw.planUntilAge = raw.retirementAge;
+    return raw;
+  }
+
+  function computeSchedule(inputs) {
+    const { currentAge, retirementAge, planUntilAge, annualIncome, annualExpenses, startingCorpus, growthPre, growthPost, inflation } = inputs;
+    const rows = [];
+    let prevExpenses = annualExpenses;
+    let prevCorpus = null;
+    let depleted = false;
+    let depletionAge = null;
+
+    for (let age = currentAge; age <= planUntilAge; age++) {
+      const isFirstYear = age === currentAge;
+      const isWorking = age < retirementAge;
+      const growthRate = (isWorking ? growthPre : growthPost) / 100;
+      let expenses, netFlow, corpusEnd, income;
+
+      if (isFirstYear) {
+        expenses = annualExpenses;
+        income = isWorking ? annualIncome : 0;
+        netFlow = startingCorpus;
+        corpusEnd = startingCorpus * (1 + growthRate);
+      } else {
+        expenses = prevExpenses * (1 + inflation / 100);
+        income = isWorking ? annualIncome : 0;
+        if (isWorking) {
+          netFlow = annualIncome - expenses;
+          corpusEnd = (netFlow + prevCorpus) * (1 + growthRate);
+        } else {
+          netFlow = prevCorpus - expenses;
+          corpusEnd = netFlow * (1 + growthRate);
+        }
+      }
+
+      const rawCorpus = corpusEnd;
+      if (!isWorking && rawCorpus <= 0 && !depleted) {
+        depleted = true;
+        depletionAge = age;
+      }
+      if (depleted) corpusEnd = 0;
+
+      rows.push({ age, isWorking, income, expenses, netFlow, growthRate: growthRate * 100, corpusEnd, depleted });
+      prevExpenses = expenses;
+      prevCorpus = corpusEnd;
+    }
+    return { rows, depletionAge };
+  }
+
+  function renderChart(rows, retirementAge) {
+    const holder = document.getElementById("chartHolder");
+    const w = Math.max(holder.clientWidth || 900, 320);
+    const h = 260;
+    const padL = 66, padR = 16, padT = 14, padB = 28;
+    const innerW = w - padL - padR, innerH = h - padT - padB;
+
+    const maxVal = Math.max(1, ...rows.map((r) => r.corpusEnd));
+    const minAge = rows[0].age, maxAge = rows[rows.length - 1].age;
+
+    const x = (age) => padL + ((age - minAge) / (maxAge - minAge)) * innerW;
+    const y = (val) => padT + innerH - (val / maxVal) * innerH;
+
+    function pathFor(filterFn) {
+      let d = "";
+      let started = false;
+      rows.forEach((r) => {
+        if (!filterFn(r)) { started = false; return; }
+        const px = x(r.age), py = y(r.corpusEnd);
+        d += (started ? "L" : "M") + px.toFixed(1) + "," + py.toFixed(1) + " ";
+        started = true;
+      });
+      return d.trim();
+    }
+    function areaFor(filterFn) {
+      const line = pathFor(filterFn);
+      if (!line) return "";
+      const pts = rows.filter(filterFn);
+      if (!pts.length) return "";
+      const first = pts[0], last = pts[pts.length - 1];
+      return line + ` L${x(last.age).toFixed(1)},${(padT + innerH).toFixed(1)} L${x(first.age).toFixed(1)},${(padT + innerH).toFixed(1)} Z`;
+    }
+
+    const preLine = pathFor((r) => r.age <= retirementAge);
+    const postLine = pathFor((r) => r.age >= retirementAge);
+    const preArea = areaFor((r) => r.age <= retirementAge);
+    const postArea = areaFor((r) => r.age >= retirementAge);
+
+    const gridLines = [];
+    const steps = 4;
+    for (let i = 0; i <= steps; i++) {
+      const val = (maxVal / steps) * i;
+      const gy = y(val);
+      gridLines.push(`<line x1="${padL}" y1="${gy}" x2="${w - padR}" y2="${gy}" stroke="#B9C3CC" stroke-opacity="0.5" />`);
+      gridLines.push(`<text x="${padL - 8}" y="${gy + 4}" text-anchor="end" font-family="IBM Plex Mono" font-size="11" fill="#5C6472">${compactINR(val)}</text>`);
+    }
+
+    const ageTicks = [];
+    const tickCount = Math.min(8, rows.length);
+    const step = Math.max(1, Math.round(rows.length / tickCount));
+    rows.forEach((r, i) => {
+      if (i % step === 0 || i === rows.length - 1) {
+        ageTicks.push(`<text x="${x(r.age)}" y="${h - 6}" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#5C6472">${r.age}</text>`);
+      }
+    });
+
+    const retX = x(Math.min(Math.max(retirementAge, minAge), maxAge));
+
+    holder.innerHTML = `
+      <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="Corpus balance by age">
+        <defs>
+          <linearGradient id="preFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#8E6A2F" stop-opacity="0.45" />
+            <stop offset="100%" stop-color="#8E6A2F" stop-opacity="0.03" />
+          </linearGradient>
+          <linearGradient id="postFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#9C3B45" stop-opacity="0.4" />
+            <stop offset="100%" stop-color="#9C3B45" stop-opacity="0.03" />
+          </linearGradient>
+        </defs>
+        ${gridLines.join("")}
+        <line x1="${retX}" y1="${padT}" x2="${retX}" y2="${padT + innerH}" stroke="#8E6A2F" stroke-dasharray="4 3" />
+        <text x="${retX}" y="${padT - 2}" text-anchor="middle" font-family="Inter" font-size="11" fill="#8E6A2F">Retirement</text>
+        <path d="${preArea}" fill="url(#preFill)" />
+        <path d="${postArea}" fill="url(#postFill)" />
+        <path d="${preLine}" fill="none" stroke="#8E6A2F" stroke-width="2" />
+        <path d="${postLine}" fill="none" stroke="#9C3B45" stroke-width="2" />
+        ${ageTicks.join("")}
+      </svg>
+    `;
+  }
+
+  function render() {
+    const inputs = readInputs();
+    const { rows, depletionAge } = computeSchedule(inputs);
+
+    const retirementRow = rows.find((r) => r.age === inputs.retirementAge - 1);
+    const corpusAtRetirement = retirementRow ? retirementRow.corpusEnd : inputs.startingCorpus;
+    const finalRow = rows[rows.length - 1];
+    const yearsInRetirement = inputs.planUntilAge - inputs.retirementAge + 1;
+    const yearsCovered = depletionAge ? depletionAge - inputs.retirementAge : yearsInRetirement;
+
+    const stamp = document.getElementById("stamp");
+    const stampText = document.getElementById("stampText");
+    const stampSub = document.getElementById("stampSub");
+    if (depletionAge) {
+      stamp.className = "stamp bad";
+      stampText.textContent = `Runs out at age ${depletionAge}`;
+      stampSub.textContent = `${yearsCovered} of ${yearsInRetirement} retirement years covered`;
+    } else {
+      stamp.className = "stamp good";
+      stampText.textContent = `Lasts to age ${inputs.planUntilAge}`;
+      stampSub.textContent = `Closing balance ${compactINR(finalRow ? finalRow.corpusEnd : 0)}`;
+    }
+
+    document.getElementById("corpusAtRetirement").textContent = compactINR(corpusAtRetirement);
+    document.getElementById("retirementSpan").textContent = yearsInRetirement + " yrs";
+
+    renderChart(rows, inputs.retirementAge);
+
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = rows.map((r) => `
+      <tr>
+        <td class="left">${r.age}</td>
+        <td class="phase left">${r.isWorking ? "Working" : "Retired"}</td>
+        <td class="right">${r.income ? formatINR(r.income) : "\u2014"}</td>
+        <td class="right">${formatINR(r.expenses)}</td>
+        <td class="right ${r.netFlow < 0 ? "neg" : ""}">${formatINR(r.netFlow)}</td>
+        <td class="right">${r.growthRate.toFixed(1)}%</td>
+        <td class="right bold ${r.depleted ? "neg" : ""}">${r.depleted ? "Depleted" : formatINR(r.corpusEnd)}</td>
+      </tr>
+    `).join("");
+  }
+
+  fieldIds.forEach((id) => {
+    document.getElementById(id).addEventListener("input", render);
+  });
+  window.addEventListener("resize", () => render());
+
+  render();
+
+  // --- PWA install + service worker ---
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    });
+  }
+
+  let deferredPrompt = null;
+  const banner = document.getElementById("installBanner");
+  const installBtn = document.getElementById("installBtn");
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    banner.style.display = "flex";
+  });
+  installBtn.addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    banner.style.display = "none";
+  });
+  window.addEventListener("appinstalled", () => {
+    banner.style.display = "none";
+  });
+})();
+</script>
+</body>
+</html>
