@@ -113,6 +113,19 @@
 
   .footnote { font-size: 11px; color: var(--ink-soft); margin-top: 14px; line-height: 1.55; }
 
+  .save-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin: 22px 0 -4px 0; flex-wrap: wrap;
+  }
+  .save-row .btns { display: flex; gap: 10px; }
+  .btn {
+    font-family: 'Inter', sans-serif; font-weight: 600; font-size: 13px;
+    border-radius: 4px; padding: 8px 16px; cursor: pointer; border: 1px solid var(--gold);
+    background: var(--gold); color: #fff;
+  }
+  .btn.secondary { background: transparent; color: var(--gold); }
+  .save-status { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--positive); min-height: 16px; }
+
   .install-banner {
     display: none; align-items: center; justify-content: space-between; gap: 12px;
     background: var(--gold); color: #fff; padding: 10px 16px; border-radius: 4px; margin-bottom: 22px;
@@ -174,8 +187,24 @@
           <span class="field-value"><input id="planUntilAge" type="number" class="w-age"><span class="suffix">yrs</span></span>
         </div>
         <div class="field-row">
-          <span class="field-label">Growth rate, post-retirement</span>
-          <span class="field-value"><input id="growthPost" type="number" class="w-pct"><span class="suffix">%</span></span>
+          <span class="field-label">Growth %, early retirement (from age)</span>
+          <span class="field-value"><input id="growthPostStage1" type="number" class="w-pct"><span class="suffix">%</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">&#8618; step down to middle rate at age</span>
+          <span class="field-value"><input id="stage1EndAge" type="number" class="w-age"><span class="suffix">yrs</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Growth %, middle retirement</span>
+          <span class="field-value"><input id="growthPostStage2" type="number" class="w-pct"><span class="suffix">%</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">&#8618; step down to late rate at age</span>
+          <span class="field-value"><input id="stage2EndAge" type="number" class="w-age"><span class="suffix">yrs</span></span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Growth %, late retirement</span>
+          <span class="field-value"><input id="growthPostStage3" type="number" class="w-pct"><span class="suffix">%</span></span>
         </div>
         <div class="field-row">
           <span class="field-label">Inflation (expense growth)</span>
@@ -184,7 +213,15 @@
       </div>
     </div>
 
-    <div class="summary-row">
+    <div class="save-row">
+      <div id="saveStatus" class="save-status"></div>
+      <div class="btns">
+        <button id="resetBtn" class="btn secondary">Reset to defaults</button>
+        <button id="saveBtn" class="btn">Save</button>
+      </div>
+    </div>
+
+    <div class="summary-row" style="margin-top:22px;">
       <div id="stamp" class="stamp good">
         <div id="stampText" class="stamp-text"></div>
         <div id="stampSub" class="stamp-sub"></div>
@@ -234,13 +271,36 @@
   const DEFAULTS = {
     currentAge: 40, retirementAge: 56, planUntilAge: 85,
     annualIncome: 1200000, annualExpenses: 600000, startingCorpus: 6247508,
-    growthPre: 10, growthPost: 7, inflation: 6,
+    growthPre: 10,
+    growthPostStage1: 8, stage1EndAge: 66,
+    growthPostStage2: 6, stage2EndAge: 80,
+    growthPostStage3: 5,
+    inflation: 6,
   };
 
+  const STORAGE_KEY = "retirement-ledger-inputs-v1";
+
   const fieldIds = Object.keys(DEFAULTS);
+
+  function loadSaved() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const merged = {};
+      fieldIds.forEach((id) => {
+        merged[id] = typeof parsed[id] === "number" && Number.isFinite(parsed[id]) ? parsed[id] : DEFAULTS[id];
+      });
+      return merged;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const saved = loadSaved();
   fieldIds.forEach((id) => {
     const el = document.getElementById(id);
-    if (el) el.value = DEFAULTS[id];
+    if (el) el.value = (saved && saved[id] !== undefined) ? saved[id] : DEFAULTS[id];
   });
 
   function formatINR(n) {
@@ -263,12 +323,20 @@
       raw[id] = Number.isFinite(v) ? v : DEFAULTS[id];
     });
     if (raw.retirementAge <= raw.currentAge) raw.retirementAge = raw.currentAge + 1;
+    if (raw.stage1EndAge <= raw.retirementAge) raw.stage1EndAge = raw.retirementAge + 1;
+    if (raw.stage2EndAge <= raw.stage1EndAge) raw.stage2EndAge = raw.stage1EndAge + 1;
     if (raw.planUntilAge < raw.retirementAge) raw.planUntilAge = raw.retirementAge;
     return raw;
   }
 
+  function postRetirementGrowth(age, inputs) {
+    if (age < inputs.stage1EndAge) return inputs.growthPostStage1;
+    if (age < inputs.stage2EndAge) return inputs.growthPostStage2;
+    return inputs.growthPostStage3;
+  }
+
   function computeSchedule(inputs) {
-    const { currentAge, retirementAge, planUntilAge, annualIncome, annualExpenses, startingCorpus, growthPre, growthPost, inflation } = inputs;
+    const { currentAge, retirementAge, planUntilAge, annualIncome, annualExpenses, startingCorpus, growthPre, inflation } = inputs;
     const rows = [];
     let prevExpenses = annualExpenses;
     let prevCorpus = null;
@@ -278,7 +346,7 @@
     for (let age = currentAge; age <= planUntilAge; age++) {
       const isFirstYear = age === currentAge;
       const isWorking = age < retirementAge;
-      const growthRate = (isWorking ? growthPre : growthPost) / 100;
+      const growthRate = (isWorking ? growthPre : postRetirementGrowth(age, inputs)) / 100;
       let expenses, netFlow, corpusEnd, income;
 
       if (isFirstYear) {
@@ -442,6 +510,36 @@
   window.addEventListener("resize", () => render());
 
   render();
+
+  const saveStatus = document.getElementById("saveStatus");
+  let statusTimer = null;
+  function flashStatus(msg) {
+    saveStatus.textContent = msg;
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => { saveStatus.textContent = ""; }, 2500);
+  }
+
+  document.getElementById("saveBtn").addEventListener("click", () => {
+    try {
+      const current = readInputs();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+      const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      flashStatus("Saved at " + time);
+    } catch (e) {
+      flashStatus("Couldn't save — storage may be unavailable.");
+    }
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    fieldIds.forEach((id) => {
+      document.getElementById(id).value = DEFAULTS[id];
+    });
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    flashStatus("Reset to defaults");
+    render();
+  });
+
+  if (saved) flashStatus("Loaded your saved numbers");
 
   // --- PWA install + service worker ---
   if ("serviceWorker" in navigator) {
